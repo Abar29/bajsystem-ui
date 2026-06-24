@@ -1,0 +1,41 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded Square Background with Gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e5631;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d7a4a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="boxGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#c9a961;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e6d4a3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect x="10" y="10" width="180" height="180" rx="40" fill="url(#bgGradient)"/>
+  
+  <!-- Simplified Box Icon -->
+  <g transform="translate(100, 100)">
+    <!-- Box outline - clean geometric style -->
+    <path d="M -40 -15 L 0 -40 L 40 -15 L 40 25 L 0 50 L -40 25 Z" 
+          fill="none" 
+          stroke="url(#boxGradient)" 
+          stroke-width="6" 
+          stroke-linejoin="round"/>
+    
+    <!-- Top lid -->
+    <path d="M -40 -15 L 0 -40 L 40 -15 L 0 10 Z" 
+          fill="url(#boxGradient)" 
+          opacity="0.3"/>
+    
+    <!-- Center vertical line -->
+    <line x1="0" y1="-40" x2="0" y2="50" 
+          stroke="url(#boxGradient)" 
+          stroke-width="6" 
+          stroke-linecap="round"/>
+    
+    <!-- Accent dots on corners -->
+    <circle cx="0" cy="-40" r="6" fill="#c9a961"/>
+    <circle cx="-40" cy="-15" r="6" fill="#c9a961"/>
+    <circle cx="40" cy="-15" r="6" fill="#c9a961"/>
+  </g>
+</svg>

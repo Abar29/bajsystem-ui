@@ -1,0 +1,35 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="90" fill="#1e5631"/>
+  
+  <!-- Box/Package Icon - Modern Style -->
+  <g transform="translate(100, 100)">
+    <!-- Main box -->
+    <path d="M -35 -20 L 0 -35 L 35 -20 L 35 20 L 0 35 L -35 20 Z" fill="#2d7a4a" stroke="#c9a961" stroke-width="2.5"/>
+    
+    <!-- Top face -->
+    <path d="M -35 -20 L 0 -35 L 35 -20 L 0 -5 Z" fill="#3a9d5d" stroke="#c9a961" stroke-width="2.5"/>
+    
+    <!-- Left face -->
+    <path d="M -35 -20 L -35 20 L 0 35 L 0 -5 Z" fill="#2d7a4a" stroke="#c9a961" stroke-width="2.5"/>
+    
+    <!-- Right face -->
+    <path d="M 35 -20 L 35 20 L 0 35 L 0 -5 Z" fill="#245d39" stroke="#c9a961" stroke-width="2.5"/>
+    
+    <!-- Center line detail -->
+    <line x1="0" y1="-35" x2="0" y2="35" stroke="#c9a961" stroke-width="2.5"/>
+    
+    <!-- Horizontal details -->
+    <line x1="-35" y1="-20" x2="35" y2="-20" stroke="#c9a961" stroke-width="2.5" opacity="0.6"/>
+    <line x1="-35" y1="20" x2="35" y2="20" stroke="#c9a961" stroke-width="2.5" opacity="0.6"/>
+    
+    <!-- Corner accents -->
+    <circle cx="0" cy="-35" r="4" fill="#c9a961"/>
+    <circle cx="-35" cy="-20" r="4" fill="#c9a961"/>
+    <circle cx="35" cy="-20" r="4" fill="#c9a961"/>
+    <circle cx="0" cy="35" r="4" fill="#c9a961"/>
+  </g>
+  
+  <!-- Subtle shine effect -->
+  <circle cx="70" cy="70" r="20" fill="white" opacity="0.15"/>
+</svg>
