@@ -64,5 +64,40 @@ document.addEventListener('DOMContentLoaded', () => {
       window.location.href = '/login';
     });
   });
+
+  // Setup header scroll lift effect
+  setupHeaderScrollEffect();
 });
+
+/**
+ * Header Lift on Scroll Effect
+ * Adds 'scrolled' class to header when main content is scrolled
+ */
+function setupHeaderScrollEffect(): void {
+  const header = document.querySelector('.app-header') as HTMLElement;
+  const mainContent = document.getElementById('main-content');
+  
+  if (!header || !mainContent) return;
+
+  let ticking = false;
+
+  const updateHeaderState = () => {
+    const scrollTop = mainContent.scrollTop;
+    
+    if (scrollTop > 20) {
+      header.classList.add('scrolled');
+    } else {
+      header.classList.remove('scrolled');
+    }
+    
+    ticking = false;
+  };
+
+  mainContent.addEventListener('scroll', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(updateHeaderState);
+      ticking = true;
+    }
+  });
+}
 

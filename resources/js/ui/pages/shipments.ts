@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface Shipment {
   id: string;
@@ -65,6 +67,64 @@ const mockShipments: Shipment[] = [
 ];
 
 export async function renderShipments(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search shipments...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'in_transit', label: 'In Transit' },
+        { value: 'delivered', label: 'Delivered' },
+        { value: 'cancelled', label: 'Cancelled' }
+      ]
+    },
+    { id: 'dateRange', label: 'Shipment Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockShipments];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(s => 
+        s.shipmentNumber.toLowerCase().includes(query) ||
+        s.deliveryNumber.toLowerCase().includes(query) ||
+        s.agencyName.toLowerCase().includes(query) ||
+        s.trackingNumber?.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(s => s.status === currentFilters.status);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(s => {
+        const date = new Date(s.shipmentDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#shipments-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderShipmentRows(filtered);
+      setupShipmentActions(mockShipments);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Shipments</h1>
@@ -75,19 +135,12 @@ export async function renderShipments(container: HTMLElement): Promise<void> {
       <div class="card-header">
         <h2 class="card-title">All Shipments</h2>
         <button class="btn btn-primary" id="add-shipment-btn">
-          <span>➕</span>
-          New Shipment
+          ${Icons.add}
+          <span>New Shipment</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search shipments..."
-          id="shipment-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="shipments-table">
@@ -111,7 +164,7 @@ export async function renderShipments(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  setupShipmentSearch(mockShipments);
+  filterPanel.setupEventListeners();
   setupShipmentActions(mockShipments);
 }
 
@@ -134,31 +187,12 @@ function renderShipmentRows(shipments: Shipment[]): string {
       </td>
       <td>${new Date(ship.estimatedDelivery).toLocaleString()}</td>
       <td>
-        <button class="btn btn-sm btn-outline view-shipment" data-id="${ship.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-shipment" data-id="${ship.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-shipment" data-id="${ship.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-shipment" data-id="${ship.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-shipment" data-id="${ship.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-shipment" data-id="${ship.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupShipmentSearch(shipments: Shipment[]): void {
-  const searchInput = document.getElementById('shipment-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#shipments-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = shipments.filter(s => 
-      s.shipmentNumber.toLowerCase().includes(query) ||
-      s.deliveryNumber.toLowerCase().includes(query) ||
-      s.agencyName.toLowerCase().includes(query) ||
-      s.trackingNumber?.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderShipmentRows(filtered);
-    setupShipmentActions(shipments);
-  });
 }
 
 function setupShipmentActions(shipments: Shipment[]): void {

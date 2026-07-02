@@ -1,8 +1,75 @@
 import { mockUsers } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderUsers(container: HTMLElement): Promise<void> {
   const users = mockUsers;
+  let filteredUsers = [...users];
+
+  // Define filters
+  const filterConfigs: FilterConfig[] = [
+    {
+      id: 'search',
+      label: 'Search',
+      type: 'search',
+      placeholder: 'Search by username or full name...',
+    },
+    {
+      id: 'role',
+      label: 'Role',
+      type: 'select',
+      options: [
+        { value: 'Administrator', label: 'Administrator' },
+        { value: 'Manager', label: 'Manager' },
+        { value: 'User', label: 'User' },
+        { value: 'Warehouse Manager', label: 'Warehouse Manager' },
+      ],
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (values) => {
+    filteredUsers = users.filter(user => {
+      // Search filter
+      if (values.search) {
+        const search = values.search.toLowerCase();
+        const matchesSearch = 
+          user.username.toLowerCase().includes(search) ||
+          user.fullName.toLowerCase().includes(search) ||
+          user.email.toLowerCase().includes(search);
+        if (!matchesSearch) return false;
+      }
+
+      // Role filter
+      if (values.role && user.role !== values.role) {
+        return false;
+      }
+
+      // Status filter
+      if (values.status) {
+        const isActive = values.status === 'active';
+        if (user.isActive !== isActive) return false;
+      }
+
+      return true;
+    });
+    
+    const tbody = document.getElementById('tbody');
+    if (tbody) {
+      tbody.innerHTML = renderRows(filteredUsers);
+      setupActions(users);
+    }
+  });
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Users</h1>
@@ -11,33 +78,54 @@ export async function renderUsers(container: HTMLElement): Promise<void> {
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">All Users</h2>
-        <button class="btn btn-primary" id="add-btn"><span>➕</span> Add User</button>
+        <button class="btn btn-primary" id="add-btn">
+          ${Icons.add}
+          <span>Add User</span>
+        </button>
       </div>
-      <div class="search-box"><input type="text" class="search-input" placeholder="Search users..." id="search" /></div>
+      
+      ${filterPanel.render()}
+      
       <div class="table-container">
-        <table><thead><tr><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="tbody">${renderRows(users)}</tbody></table>
+        <table>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Full Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">${renderRows(filteredUsers)}</tbody>
+        </table>
       </div>
     </div>
   `;
+  
+  filterPanel.setupEventListeners();
   setupActions(users);
 }
 
 function renderRows(items: any[]): string {
-  return items.map(u => `<tr><td><strong>${u.username}</strong></td><td>${u.fullName}</td><td>${u.email}</td><td>${u.role}</td>
-  <td><span class="badge badge-${u.isActive ? 'success' : 'secondary'}">${u.isActive ? 'ACTIVE' : 'INACTIVE'}</span></td>
-  <td><button class="btn btn-sm btn-outline view-btn" data-id="${u.id}">👁️</button>
-  <button class="btn btn-sm btn-outline edit-btn" data-id="${u.id}">✏️</button>
-  <button class="btn btn-sm btn-outline delete-btn" data-id="${u.id}">🗑️</button></td></tr>`).join('');
+  return items.map(u => `
+    <tr>
+      <td><strong>${u.username}</strong></td>
+      <td>${u.fullName}</td>
+      <td>${u.email}</td>
+      <td>${u.role}</td>
+      <td><span class="badge badge-${u.isActive ? 'success' : 'secondary'}">${u.isActive ? 'ACTIVE' : 'INACTIVE'}</span></td>
+      <td>
+        <button class="btn btn-sm btn-outline view-btn" data-id="${u.id}">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-btn" data-id="${u.id}">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-btn" data-id="${u.id}">${Icons.delete}</button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function setupActions(items: any[]): void {
-  document.getElementById('search')?.addEventListener('input', (e) => {
-    const q = (e.target as HTMLInputElement).value.toLowerCase();
-    const tbody = document.getElementById('tbody');
-    if(tbody) tbody.innerHTML = renderRows(items.filter(u => u.username.toLowerCase().includes(q) || u.fullName.toLowerCase().includes(q)));
-    setupActions(items);
-  });
   
   document.getElementById('add-btn')?.addEventListener('click', () => showForm('create'));
   document.querySelectorAll('.view-btn').forEach(b => b.addEventListener('click', (e) => {

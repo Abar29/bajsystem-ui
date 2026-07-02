@@ -1,8 +1,81 @@
 import { mockPurchaseRequests } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 export async function renderPurchaseRequests(container: HTMLElement): Promise<void> {
   const requests = mockPurchaseRequests;
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search requests...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'completed', label: 'Completed' }
+      ]
+    },
+    { 
+      id: 'priority', 
+      label: 'Priority', 
+      type: 'select',
+      options: [
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' },
+        { value: 'urgent', label: 'Urgent' }
+      ]
+    },
+    { id: 'dateRange', label: 'Request Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...requests];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.requestNumber.toLowerCase().includes(query) ||
+        r.requester.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(r => r.status === currentFilters.status);
+    }
+    
+    if (currentFilters.priority) {
+      filtered = filtered.filter(r => r.priority === currentFilters.priority);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(r => {
+        const date = new Date(r.requestDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tbody = document.getElementById('tbody');
+    if (tbody) {
+      tbody.innerHTML = renderRows(filtered);
+      setupActions(requests);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Purchase Requests</h1>
@@ -11,15 +84,16 @@ export async function renderPurchaseRequests(container: HTMLElement): Promise<vo
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">All Purchase Requests</h2>
-        <button class="btn btn-primary" id="add-btn"><span>➕</span> Create Request</button>
+        <button class="btn btn-primary" id="add-btn">${Icons.add}<span>Create Request</span></button>
       </div>
-      <div class="search-box"><input type="text" class="search-input" placeholder="Search..." id="search" /></div>
+      ${filterPanel.render()}
       <div class="table-container">
         <table><thead><tr><th>Request #</th><th>Date</th><th>Requester</th><th>Department</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="tbody">${renderRows(requests)}</tbody></table>
       </div>
     </div>
   `;
+  filterPanel.setupEventListeners();
   setupActions(requests);
 }
 
@@ -27,20 +101,13 @@ function renderRows(items: any[]): string {
   return items.map(r => `<tr><td><strong>${r.requestNumber}</strong></td><td>${new Date(r.requestDate).toLocaleDateString()}</td>
   <td>${r.requester}</td><td>${r.department}</td><td><span class="badge badge-${r.priority === 'urgent' ? 'danger' : r.priority === 'high' ? 'warning' : 'info'}">${r.priority.toUpperCase()}</span></td>
   <td><span class="badge badge-${r.status === 'approved' ? 'success' : r.status === 'pending' ? 'warning' : r.status === 'rejected' ? 'danger' : 'secondary'}">${r.status.toUpperCase()}</span></td>
-  <td><button class="btn btn-sm btn-outline view-btn" data-id="${r.id}">👁️</button>
-  <button class="btn btn-sm btn-outline edit-btn" data-id="${r.id}">✏️</button>
-  ${r.status === 'pending' ? `<button class="btn btn-sm btn-outline approve-btn" data-id="${r.id}">✅</button>` : ''}
-  <button class="btn btn-sm btn-outline delete-btn" data-id="${r.id}">🗑️</button></td></tr>`).join('');
+  <td><button class="btn btn-sm btn-outline view-btn" data-id="${r.id}">${Icons.view}</button>
+  <button class="btn btn-sm btn-outline edit-btn" data-id="${r.id}">${Icons.edit}</button>
+  ${r.status === 'pending' ? `<button class="btn btn-sm btn-outline approve-btn" data-id="${r.id}">${Icons.check}</button>` : ''}
+  <button class="btn btn-sm btn-outline delete-btn" data-id="${r.id}">${Icons.delete}</button></td></tr>`).join('');
 }
 
 function setupActions(items: any[]): void {
-  document.getElementById('search')?.addEventListener('input', (e) => {
-    const q = (e.target as HTMLInputElement).value.toLowerCase();
-    const tbody = document.getElementById('tbody');
-    if(tbody) tbody.innerHTML = renderRows(items.filter(r => r.requestNumber.toLowerCase().includes(q) || r.requester.toLowerCase().includes(q)));
-    setupActions(items);
-  });
-  
   document.getElementById('add-btn')?.addEventListener('click', () => showForm('create'));
   document.querySelectorAll('.view-btn').forEach(b => b.addEventListener('click', (e) => {
     const r = items.find(x => x.id === (e.target as HTMLElement).closest('button')?.dataset.id);

@@ -1,12 +1,61 @@
 import type { Agency } from '../../types';
 import { mockAgencies } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderAgencies(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading agencies...</div>';
 
   try {
     const agencies = mockAgencies;
+    let filteredAgencies = [...agencies];
+
+    // Define filters
+    const filterConfigs: FilterConfig[] = [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'search',
+        placeholder: 'Search agencies by name or code...',
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' },
+        ],
+      },
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filteredAgencies = agencies.filter(agency => {
+        // Search filter
+        if (values.search) {
+          const search = values.search.toLowerCase();
+          const matchesSearch = 
+            agency.name.toLowerCase().includes(search) ||
+            agency.code.toLowerCase().includes(search) ||
+            agency.contactPerson.toLowerCase().includes(search);
+          if (!matchesSearch) return false;
+        }
+
+        // Status filter
+        if (values.status && agency.status !== values.status) {
+          return false;
+        }
+
+        return true;
+      });
+      
+      const tableBody = document.querySelector('#agencies-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = renderRows(filteredAgencies);
+        setupActions(agencies);
+      }
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -18,14 +67,12 @@ export async function renderAgencies(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">All Agencies</h2>
           <button class="btn btn-primary" id="add-agency-btn">
-            <span>➕</span>
-            Add Agency
+            ${Icons.add}
+            <span>Add Agency</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input type="text" class="search-input" placeholder="Search agencies..." id="agency-search" />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table id="agencies-table">
@@ -41,13 +88,14 @@ export async function renderAgencies(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              ${renderRows(agencies)}
+              ${renderRows(filteredAgencies)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    filterPanel.setupEventListeners();
     setupActions(agencies);
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load agencies</div>';
@@ -64,26 +112,15 @@ function renderRows(agencies: Agency[]): string {
       <td>${a.phone}</td>
       <td><span class="badge badge-${a.status === 'active' ? 'success' : 'secondary'}">${a.status.toUpperCase()}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline view-btn" data-id="${a.id}">👁️</button>
-        <button class="btn btn-sm btn-outline edit-btn" data-id="${a.id}">✏️</button>
-        <button class="btn btn-sm btn-outline delete-btn" data-id="${a.id}">🗑️</button>
+        <button class="btn btn-sm btn-outline view-btn" data-id="${a.id}">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-btn" data-id="${a.id}">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-btn" data-id="${a.id}">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
 }
 
 function setupActions(agencies: Agency[]): void {
-  const searchInput = document.getElementById('agency-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#agencies-table tbody');
-
-  searchInput?.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = agencies.filter(a => 
-      a.name.toLowerCase().includes(query) || a.code.toLowerCase().includes(query)
-    );
-    if (tableBody) tableBody.innerHTML = renderRows(filtered);
-    setupActions(agencies);
-  });
 
   document.getElementById('add-agency-btn')?.addEventListener('click', () => {
     showForm('create');

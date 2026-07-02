@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 interface Role {
   id: string;
@@ -71,6 +73,55 @@ const mockRoles: Role[] = [
 ];
 
 export async function renderRoles(container: HTMLElement): Promise<void> {
+  let filteredRoles = [...mockRoles];
+
+  // Define filters
+  const filterConfigs: FilterConfig[] = [
+    {
+      id: 'search',
+      label: 'Search',
+      type: 'search',
+      placeholder: 'Search roles by name or code...',
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'inactive', label: 'Inactive' },
+      ],
+    },
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (values) => {
+    filteredRoles = mockRoles.filter(role => {
+      // Search filter
+      if (values.search) {
+        const search = values.search.toLowerCase();
+        const matchesSearch = 
+          role.code.toLowerCase().includes(search) ||
+          role.name.toLowerCase().includes(search) ||
+          role.description.toLowerCase().includes(search);
+        if (!matchesSearch) return false;
+      }
+
+      // Status filter
+      if (values.status) {
+        const isActive = values.status === 'active';
+        if (role.isActive !== isActive) return false;
+      }
+
+      return true;
+    });
+    
+    const tableBody = document.querySelector('#roles-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderRoleRows(filteredRoles);
+      setupRoleActions(mockRoles);
+    }
+  });
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Roles</h1>
@@ -81,19 +132,12 @@ export async function renderRoles(container: HTMLElement): Promise<void> {
       <div class="card-header">
         <h2 class="card-title">All Roles</h2>
         <button class="btn btn-primary" id="add-role-btn">
-          <span>➕</span>
-          Add Role
+          ${Icons.add}
+          <span>Add Role</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search roles..."
-          id="role-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="roles-table">
@@ -108,14 +152,14 @@ export async function renderRoles(container: HTMLElement): Promise<void> {
             </tr>
           </thead>
           <tbody>
-            ${renderRoleRows(mockRoles)}
+            ${renderRoleRows(filteredRoles)}
           </tbody>
         </table>
       </div>
     </div>
   `;
 
-  setupRoleSearch(mockRoles);
+  filterPanel.setupEventListeners();
   setupRoleActions(mockRoles);
 }
 
@@ -132,30 +176,12 @@ function renderRoleRows(roles: Role[]): string {
         </span>
       </td>
       <td>
-        <button class="btn btn-sm btn-outline view-role" data-id="${role.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-role" data-id="${role.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-role" data-id="${role.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-role" data-id="${role.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-role" data-id="${role.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-role" data-id="${role.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupRoleSearch(roles: Role[]): void {
-  const searchInput = document.getElementById('role-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#roles-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = roles.filter(r => 
-      r.code.toLowerCase().includes(query) ||
-      r.name.toLowerCase().includes(query) ||
-      r.description.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderRoleRows(filtered);
-    setupRoleActions(roles);
-  });
 }
 
 function setupRoleActions(roles: Role[]): void {

@@ -1,12 +1,35 @@
 import type { Item } from '../../types';
 import { mockItems } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderItems(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading items...</div>';
 
   try {
     const items = mockItems;
+    let filtered = [...items];
+
+    const filterConfigs: FilterConfig[] = [
+      { id: 'search', label: 'Search', type: 'search', placeholder: 'Search items...' },
+      { id: 'status', label: 'Status', type: 'select', options: [
+        { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }
+      ]},
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filtered = items.filter(i => {
+        if (values.search && !i.name.toLowerCase().includes(values.search.toLowerCase()) && !i.code.toLowerCase().includes(values.search.toLowerCase())) return false;
+        if (values.status && i.status !== values.status) return false;
+        return true;
+      });
+      const tableBody = document.querySelector('#items-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = renderRows(filtered);
+        setupActions(items);
+      }
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -18,14 +41,11 @@ export async function renderItems(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">All Items</h2>
           <button class="btn btn-primary" id="add-item-btn">
-            <span>➕</span>
-            Add Item
+            ${Icons.add}<span>Add Item</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input type="text" class="search-input" placeholder="Search items..." id="item-search" />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table id="items-table">
@@ -42,13 +62,14 @@ export async function renderItems(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              ${renderRows(items)}
+              ${renderRows(filtered)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    filterPanel.setupEventListeners();
     setupActions(items);
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load items</div>';
@@ -66,27 +87,15 @@ function renderRows(items: Item[]): string {
       <td>${i.reorderPoint}</td>
       <td><span class="badge badge-${i.status === 'active' ? 'success' : 'secondary'}">${i.status.toUpperCase()}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline view-btn" data-id="${i.id}">👁️</button>
-        <button class="btn btn-sm btn-outline edit-btn" data-id="${i.id}">✏️</button>
-        <button class="btn btn-sm btn-outline delete-btn" data-id="${i.id}">🗑️</button>
+        <button class="btn btn-sm btn-outline view-btn" data-id="${i.id}">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-btn" data-id="${i.id}">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-btn" data-id="${i.id}">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
 }
 
 function setupActions(items: Item[]): void {
-  const searchInput = document.getElementById('item-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#items-table tbody');
-
-  searchInput?.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = items.filter(i => 
-      i.name.toLowerCase().includes(query) || i.code.toLowerCase().includes(query)
-    );
-    if (tableBody) tableBody.innerHTML = renderRows(filtered);
-    setupActions(items);
-  });
-
   document.getElementById('add-item-btn')?.addEventListener('click', () => showForm('create'));
 
   document.querySelectorAll('.view-btn').forEach(btn => {

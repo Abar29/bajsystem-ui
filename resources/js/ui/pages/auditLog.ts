@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface AuditLogEntry {
   id: string;
@@ -147,6 +149,79 @@ const mockAuditLogs: AuditLogEntry[] = [
 ];
 
 export async function renderAuditLog(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search by user, entity, or ID...' },
+    { 
+      id: 'module', 
+      label: 'Module', 
+      type: 'select',
+      options: [
+        { value: 'Purchase Orders', label: 'Purchase Orders' },
+        { value: 'Inventory', label: 'Inventory' },
+        { value: 'Suppliers', label: 'Suppliers' },
+        { value: 'Deliveries', label: 'Deliveries' },
+        { value: 'Users', label: 'Users' },
+        { value: 'Roles', label: 'Roles' }
+      ]
+    },
+    { 
+      id: 'action', 
+      label: 'Action', 
+      type: 'select',
+      options: [
+        { value: 'CREATE', label: 'Create' },
+        { value: 'UPDATE', label: 'Update' },
+        { value: 'DELETE', label: 'Delete' }
+      ]
+    },
+    { id: 'dateRange', label: 'Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockAuditLogs];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(log => 
+        log.user.toLowerCase().includes(query) ||
+        log.entity.toLowerCase().includes(query) ||
+        log.entityId.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.module) {
+      filtered = filtered.filter(log => log.module === currentFilters.module);
+    }
+    
+    if (currentFilters.action) {
+      filtered = filtered.filter(log => log.action === currentFilters.action);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(log => {
+        const date = new Date(log.timestamp);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#audit-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderAuditRows(filtered);
+      setupAuditActions(mockAuditLogs);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Audit Log</h1>
@@ -156,33 +231,9 @@ export async function renderAuditLog(container: HTMLElement): Promise<void> {
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">Activity Log</h2>
-        <div style="display: flex; gap: 10px;">
-          <select class="form-select" id="filter-module" style="width: 200px;">
-            <option value="">All Modules</option>
-            <option value="Purchase Orders">Purchase Orders</option>
-            <option value="Inventory">Inventory</option>
-            <option value="Suppliers">Suppliers</option>
-            <option value="Deliveries">Deliveries</option>
-            <option value="Users">Users</option>
-            <option value="Roles">Roles</option>
-          </select>
-          <select class="form-select" id="filter-action" style="width: 150px;">
-            <option value="">All Actions</option>
-            <option value="CREATE">Create</option>
-            <option value="UPDATE">Update</option>
-            <option value="DELETE">Delete</option>
-          </select>
-        </div>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search by user, entity, or ID..."
-          id="audit-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="audit-table">
@@ -205,7 +256,7 @@ export async function renderAuditLog(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  setupAuditSearch(mockAuditLogs);
+  filterPanel.setupEventListeners();
   setupAuditActions(mockAuditLogs);
 }
 
@@ -226,44 +277,10 @@ function renderAuditRows(logs: AuditLogEntry[]): string {
       <td>${log.entity}</td>
       <td><code>${log.entityId}</code></td>
       <td>
-        <button class="btn btn-sm btn-outline view-audit" data-id="${log.id}" title="View Details">👁️</button>
+        <button class="btn btn-sm btn-outline view-audit" data-id="${log.id}" title="View Details">${Icons.view}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupAuditSearch(logs: AuditLogEntry[]): void {
-  const searchInput = document.getElementById('audit-search') as HTMLInputElement;
-  const filterModule = document.getElementById('filter-module') as HTMLSelectElement;
-  const filterAction = document.getElementById('filter-action') as HTMLSelectElement;
-  const tableBody = document.querySelector('#audit-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  const applyFilters = () => {
-    const query = searchInput.value.toLowerCase();
-    const module = filterModule.value;
-    const action = filterAction.value;
-
-    const filtered = logs.filter(log => {
-      const matchesQuery = !query || 
-        log.user.toLowerCase().includes(query) ||
-        log.entity.toLowerCase().includes(query) ||
-        log.entityId.toLowerCase().includes(query);
-      
-      const matchesModule = !module || log.module === module;
-      const matchesAction = !action || log.action === action;
-
-      return matchesQuery && matchesModule && matchesAction;
-    });
-
-    tableBody.innerHTML = renderAuditRows(filtered);
-    setupAuditActions(logs);
-  };
-
-  searchInput.addEventListener('input', applyFilters);
-  filterModule?.addEventListener('change', applyFilters);
-  filterAction?.addEventListener('change', applyFilters);
 }
 
 function setupAuditActions(logs: AuditLogEntry[]): void {

@@ -1,12 +1,32 @@
 import type { Branch } from '../../types';
 import { mockBranches } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderBranches(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading branches...</div>';
 
   try {
     const branches = mockBranches;
+    let filtered = [...branches];
+
+    const filterConfigs: FilterConfig[] = [
+      { id: 'search', label: 'Search', type: 'search', placeholder: 'Search branches...' },
+      { id: 'status', label: 'Status', type: 'select', options: [
+        { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }
+      ]},
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filtered = branches.filter(b => {
+        if (values.search && !b.name.toLowerCase().includes(values.search.toLowerCase()) && !b.code.toLowerCase().includes(values.search.toLowerCase())) return false;
+        if (values.status && b.status !== values.status) return false;
+        return true;
+      });
+      document.getElementById('table-body')!.innerHTML = renderRows(filtered);
+      setupActions(branches);
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -18,14 +38,11 @@ export async function renderBranches(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">All Branches</h2>
           <button class="btn btn-primary" id="add-btn">
-            <span>➕</span>
-            Add Branch
+            ${Icons.add}<span>Add Branch</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input type="text" class="search-input" placeholder="Search branches..." id="search" />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table>
@@ -41,13 +58,14 @@ export async function renderBranches(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody id="table-body">
-              ${renderRows(branches)}
+              ${renderRows(filtered)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    filterPanel.setupEventListeners();
     setupActions(branches);
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load branches</div>';
@@ -64,22 +82,15 @@ function renderRows(items: Branch[]): string {
       <td>${b.manager}</td>
       <td><span class="badge badge-${b.status === 'active' ? 'success' : 'secondary'}">${b.status.toUpperCase()}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline view-btn" data-id="${b.id}">👁️</button>
-        <button class="btn btn-sm btn-outline edit-btn" data-id="${b.id}">✏️</button>
-        <button class="btn btn-sm btn-outline delete-btn" data-id="${b.id}">🗑️</button>
+        <button class="btn btn-sm btn-outline view-btn" data-id="${b.id}">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-btn" data-id="${b.id}">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-btn" data-id="${b.id}">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
 }
 
 function setupActions(items: Branch[]): void {
-  document.getElementById('search')?.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = items.filter(b => b.name.toLowerCase().includes(query) || b.code.toLowerCase().includes(query));
-    document.getElementById('table-body')!.innerHTML = renderRows(filtered);
-    setupActions(items);
-  });
-
   document.getElementById('add-btn')?.addEventListener('click', () => showForm('create'));
 
   document.querySelectorAll('.view-btn').forEach(btn => {

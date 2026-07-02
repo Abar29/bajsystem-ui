@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface Return {
   id: string;
@@ -94,6 +96,78 @@ const mockReturns: Return[] = [
 ];
 
 export async function renderReturns(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search returns...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'approved', label: 'Approved' },
+        { value: 'processing', label: 'Processing' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'rejected', label: 'Rejected' }
+      ]
+    },
+    { 
+      id: 'type', 
+      label: 'Type', 
+      type: 'select',
+      options: [
+        { value: 'return', label: 'Return' },
+        { value: 'recall', label: 'Recall' }
+      ]
+    },
+    { id: 'dateRange', label: 'Return Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockReturns];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.returnNumber.toLowerCase().includes(query) ||
+        r.deliveryNumber.toLowerCase().includes(query) ||
+        r.agencyName.toLowerCase().includes(query) ||
+        r.reason.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(r => r.status === currentFilters.status);
+    }
+    
+    if (currentFilters.type) {
+      filtered = filtered.filter(r => r.type === currentFilters.type);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(r => {
+        const date = new Date(r.returnDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#returns-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderReturnRows(filtered);
+      setupReturnActions(mockReturns);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Returns & Recalls</h1>
@@ -104,19 +178,12 @@ export async function renderReturns(container: HTMLElement): Promise<void> {
       <div class="card-header">
         <h2 class="card-title">All Returns & Recalls</h2>
         <button class="btn btn-primary" id="add-return-btn">
-          <span>➕</span>
-          New Return
+          ${Icons.add}
+          <span>New Return</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search returns..."
-          id="return-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="returns-table">
@@ -140,7 +207,7 @@ export async function renderReturns(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  setupReturnSearch(mockReturns);
+  filterPanel.setupEventListeners();
   setupReturnActions(mockReturns);
 }
 
@@ -167,31 +234,12 @@ function renderReturnRows(returns: Return[]): string {
         </span>
       </td>
       <td>
-        <button class="btn btn-sm btn-outline view-return" data-id="${ret.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-return" data-id="${ret.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-return" data-id="${ret.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-return" data-id="${ret.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-return" data-id="${ret.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-return" data-id="${ret.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupReturnSearch(returns: Return[]): void {
-  const searchInput = document.getElementById('return-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#returns-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = returns.filter(r => 
-      r.returnNumber.toLowerCase().includes(query) ||
-      r.deliveryNumber.toLowerCase().includes(query) ||
-      r.agencyName.toLowerCase().includes(query) ||
-      r.reason.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderReturnRows(filtered);
-    setupReturnActions(returns);
-  });
 }
 
 function setupReturnActions(returns: Return[]): void {

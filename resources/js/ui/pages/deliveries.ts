@@ -1,5 +1,7 @@
 import { deliveryService } from '../../api/services/delivery';
 import type { DeliveryOrder } from '../../types';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderDeliveries(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading deliveries...</div>';
@@ -9,6 +11,74 @@ export async function renderDeliveries(container: HTMLElement): Promise<void> {
       deliveryService.getAll(),
       deliveryService.getPending(),
     ]);
+
+    let filteredDeliveries = [...deliveries];
+
+    // Define filters
+    const filterConfigs: FilterConfig[] = [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'search',
+        placeholder: 'Search by delivery number or agency...',
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'draft', label: 'Draft' },
+          { value: 'scheduled', label: 'Scheduled' },
+          { value: 'in_transit', label: 'In Transit' },
+          { value: 'delivered', label: 'Delivered' },
+          { value: 'cancelled', label: 'Cancelled' },
+        ],
+      },
+      {
+        id: 'dateRange',
+        label: 'Delivery Date',
+        type: 'dateRange',
+      },
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filteredDeliveries = deliveries.filter(delivery => {
+        // Search filter
+        if (values.search) {
+          const search = values.search.toLowerCase();
+          const matchesSearch = 
+            delivery.deliveryNumber.toLowerCase().includes(search) ||
+            delivery.agencyName.toLowerCase().includes(search) ||
+            delivery.driver.toLowerCase().includes(search);
+          if (!matchesSearch) return false;
+        }
+
+        // Status filter
+        if (values.status && delivery.status !== values.status) {
+          return false;
+        }
+
+        // Date range filter
+        if (values.dateRange?.start || values.dateRange?.end) {
+          const deliveryDate = new Date(delivery.deliveryDate);
+          if (values.dateRange.start) {
+            const startDate = new Date(values.dateRange.start);
+            if (deliveryDate < startDate) return false;
+          }
+          if (values.dateRange.end) {
+            const endDate = new Date(values.dateRange.end);
+            if (deliveryDate > endDate) return false;
+          }
+        }
+
+        return true;
+      });
+      
+      const tableBody = document.querySelector('#delivery-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = renderDeliveryRows(filteredDeliveries);
+      }
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -35,19 +105,12 @@ export async function renderDeliveries(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">Delivery Orders</h2>
           <button class="btn btn-primary">
-            <span>➕</span>
-            Create Delivery
+            ${Icons.add}
+            <span>Create Delivery</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input 
-            type="text" 
-            class="search-input" 
-            placeholder="Search by delivery number or agency..."
-            id="delivery-search"
-          />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table id="delivery-table">
@@ -63,14 +126,14 @@ export async function renderDeliveries(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              ${renderDeliveryRows(deliveries)}
+              ${renderDeliveryRows(filteredDeliveries)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
-    setupDeliverySearch(deliveries);
+    filterPanel.setupEventListeners();
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load deliveries</div>';
     console.error('Deliveries error:', error);
@@ -87,9 +150,9 @@ function renderDeliveryRows(deliveries: DeliveryOrder[]): string {
       <td>${delivery.vehicle}</td>
       <td><span class="badge badge-${getStatusBadgeClass(delivery.status)}">${delivery.status.replace('_', ' ').toUpperCase()}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline" title="Track">📍</button>
-        <button class="btn btn-sm btn-outline" title="Print">🖨️</button>
+        <button class="btn btn-sm btn-outline" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline" title="Track">${Icons.mapPin}</button>
+        <button class="btn btn-sm btn-outline" title="Print">${Icons.print}</button>
       </td>
     </tr>
   `).join('');

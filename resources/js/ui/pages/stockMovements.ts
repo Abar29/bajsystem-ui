@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 interface StockMovement {
   id: string;
@@ -81,6 +83,74 @@ const mockStockMovements: StockMovement[] = [
 ];
 
 export async function renderStockMovements(container: HTMLElement): Promise<void> {
+  let filteredMovements = [...mockStockMovements];
+
+  // Define filters
+  const filterConfigs: FilterConfig[] = [
+    {
+      id: 'search',
+      label: 'Search',
+      type: 'search',
+      placeholder: 'Search movements...',
+    },
+    {
+      id: 'movementType',
+      label: 'Movement Type',
+      type: 'select',
+      options: [
+        { value: 'in', label: 'Stock In' },
+        { value: 'out', label: 'Stock Out' },
+        { value: 'transfer', label: 'Transfer' },
+        { value: 'adjustment', label: 'Adjustment' },
+      ],
+    },
+    {
+      id: 'dateRange',
+      label: 'Movement Date',
+      type: 'dateRange',
+    },
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (values) => {
+    filteredMovements = mockStockMovements.filter(movement => {
+      // Search filter
+      if (values.search) {
+        const search = values.search.toLowerCase();
+        const matchesSearch = 
+          movement.movementNumber.toLowerCase().includes(search) ||
+          movement.itemName.toLowerCase().includes(search) ||
+          movement.reference.toLowerCase().includes(search);
+        if (!matchesSearch) return false;
+      }
+
+      // Movement type filter
+      if (values.movementType && movement.movementType !== values.movementType) {
+        return false;
+      }
+
+      // Date range filter
+      if (values.dateRange?.start || values.dateRange?.end) {
+        const movementDate = new Date(movement.movementDate);
+        if (values.dateRange.start) {
+          const startDate = new Date(values.dateRange.start);
+          if (movementDate < startDate) return false;
+        }
+        if (values.dateRange.end) {
+          const endDate = new Date(values.dateRange.end);
+          if (movementDate > endDate) return false;
+        }
+      }
+
+      return true;
+    });
+    
+    const tableBody = document.querySelector('#movements-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderMovementRows(filteredMovements);
+      setupMovementActions(mockStockMovements);
+    }
+  });
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Stock Movements</h1>
@@ -91,19 +161,12 @@ export async function renderStockMovements(container: HTMLElement): Promise<void
       <div class="card-header">
         <h2 class="card-title">All Stock Movements</h2>
         <button class="btn btn-primary" id="add-movement-btn">
-          <span>➕</span>
-          Record Movement
+          ${Icons.add}
+          <span>Record Movement</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search movements..."
-          id="movement-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="movements-table">
@@ -120,14 +183,14 @@ export async function renderStockMovements(container: HTMLElement): Promise<void
             </tr>
           </thead>
           <tbody>
-            ${renderMovementRows(mockStockMovements)}
+            ${renderMovementRows(filteredMovements)}
           </tbody>
         </table>
       </div>
     </div>
   `;
 
-  setupMovementSearch(mockStockMovements);
+  filterPanel.setupEventListeners();
   setupMovementActions(mockStockMovements);
 }
 
@@ -156,28 +219,10 @@ function renderMovementRows(movements: StockMovement[]): string {
       </td>
       <td>${mv.reference}</td>
       <td>
-        <button class="btn btn-sm btn-outline view-movement" data-id="${mv.id}" title="View">👁️</button>
+        <button class="btn btn-sm btn-outline view-movement" data-id="${mv.id}" title="View">${Icons.view}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupMovementSearch(movements: StockMovement[]): void {
-  const searchInput = document.getElementById('movement-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#movements-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = movements.filter(m => 
-      m.movementNumber.toLowerCase().includes(query) ||
-      m.itemName.toLowerCase().includes(query) ||
-      m.reference.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderMovementRows(filtered);
-    setupMovementActions(movements);
-  });
 }
 
 function setupMovementActions(movements: StockMovement[]): void {

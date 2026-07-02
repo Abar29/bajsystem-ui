@@ -39,36 +39,41 @@ function setupSidebar(): void {
   const burgerMenu = document.getElementById('burger-menu');
   const sidebarOverlay = document.getElementById('sidebar-overlay');
   const sidebar = document.getElementById('sidebar');
-  const mainContent = document.getElementById('main-content');
+  const appContainer = document.querySelector('.app-container');
 
   const toggleSidebar = () => {
     sidebarOpen = !sidebarOpen;
     
-    if (window.innerWidth < 768) {
+    if (window.innerWidth < 1024) {
+      // Tablet/Mobile: Toggle slide-out drawer
       sidebar?.classList.toggle('open');
       sidebarOverlay?.classList.toggle('active');
     } else {
+      // Desktop: Toggle collapsed state using CSS Grid
       sidebar?.classList.toggle('collapsed');
-      mainContent?.classList.toggle('expanded');
+      appContainer?.classList.toggle('sidebar-collapsed');
     }
   };
 
   burgerMenu?.addEventListener('click', toggleSidebar);
+  
   sidebarOverlay?.addEventListener('click', () => {
-    if (window.innerWidth < 768) {
+    if (window.innerWidth < 1024) {
       sidebar?.classList.remove('open');
       sidebarOverlay?.classList.remove('active');
+      sidebarOpen = false;
     }
   });
 
   window.addEventListener('resize', () => {
-    if (window.innerWidth >= 768) {
+    if (window.innerWidth >= 1024) {
+      // Desktop: Remove mobile/tablet classes
       sidebar?.classList.remove('open');
       sidebarOverlay?.classList.remove('active');
     } else {
+      // Tablet/Mobile: Remove desktop collapsed class
       sidebar?.classList.remove('collapsed');
-      sidebar?.classList.remove('open');
-      mainContent?.classList.remove('expanded');
+      appContainer?.classList.remove('sidebar-collapsed');
     }
   });
 }

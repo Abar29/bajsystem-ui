@@ -1,5 +1,6 @@
 import { mockUnits } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
 
 export async function renderUnits(container: HTMLElement): Promise<void> {
   const units = mockUnits;
@@ -11,14 +12,14 @@ export async function renderUnits(container: HTMLElement): Promise<void> {
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">All Units</h2>
-        <button class="btn btn-primary" id="add-btn"><span>➕</span> Add Unit</button>
+        <button class="btn btn-primary" id="add-btn">${Icons.add}<span>Add Unit</span></button>
       </div>
       <div class="table-container">
         <table><thead><tr><th>Code</th><th>Name</th><th>Description</th><th>Actions</th></tr></thead>
         <tbody id="tbody">${units.map(u => `<tr><td><strong>${u.code}</strong></td><td>${u.name}</td><td>${u.description}</td>
-        <td><button class="btn btn-sm btn-outline view-btn" data-id="${u.id}">👁️</button>
-        <button class="btn btn-sm btn-outline edit-btn" data-id="${u.id}">✏️</button>
-        <button class="btn btn-sm btn-outline delete-btn" data-id="${u.id}">🗑️</button></td></tr>`).join('')}</tbody></table>
+        <td><button class="btn btn-sm btn-outline view-btn" data-id="${u.id}">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-btn" data-id="${u.id}">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-btn" data-id="${u.id}">${Icons.delete}</button></td></tr>`).join('')}</tbody></table>
       </div>
     </div>
   `;

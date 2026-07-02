@@ -1,5 +1,7 @@
 import { inventoryService } from '../../api/services/inventory';
 import type { StockItem } from '../../types';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderInventory(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading inventory...</div>';
@@ -10,6 +12,8 @@ export async function renderInventory(container: HTMLElement): Promise<void> {
       inventoryService.getLowStockItems(),
       inventoryService.getExpiringBatches(30),
     ]);
+
+    let filteredStockItems = [...stockItems];
 
     container.innerHTML = `
       <div class="page-header">
@@ -36,23 +40,88 @@ export async function renderInventory(container: HTMLElement): Promise<void> {
 
       ${lowStock.length > 0 ? renderLowStockAlert(lowStock) : ''}
 
+    `;
+
+    // Define filters
+    const filterConfigs: FilterConfig[] = [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'search',
+        placeholder: 'Search by item code or name...',
+      },
+      {
+        id: 'warehouse',
+        label: 'Warehouse',
+        type: 'select',
+        options: [
+          { value: 'Main Warehouse', label: 'Main Warehouse' },
+          { value: 'Cold Storage Facility', label: 'Cold Storage' },
+          { value: 'Regional Hub North', label: 'Regional Hub North' },
+        ],
+      },
+      {
+        id: 'stockStatus',
+        label: 'Stock Status',
+        type: 'select',
+        options: [
+          { value: 'low', label: 'Low Stock' },
+          { value: 'good', label: 'Good Stock' },
+          { value: 'overstock', label: 'Overstock' },
+        ],
+      },
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filteredStockItems = stockItems.filter(item => {
+        // Search filter
+        if (values.search) {
+          const search = values.search.toLowerCase();
+          const matchesSearch = 
+            item.itemCode.toLowerCase().includes(search) ||
+            item.itemName.toLowerCase().includes(search);
+          if (!matchesSearch) return false;
+        }
+
+        // Warehouse filter
+        if (values.warehouse && item.warehouseName !== values.warehouse) {
+          return false;
+        }
+
+        // Stock status filter
+        if (values.stockStatus) {
+          if (values.stockStatus === 'low' && item.quantityAvailable > 100) {
+            return false;
+          }
+          if (values.stockStatus === 'good' && (item.quantityAvailable <= 100 || item.quantityAvailable > 1000)) {
+            return false;
+          }
+          if (values.stockStatus === 'overstock' && item.quantityAvailable <= 1000) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+      
+      const tableBody = document.querySelector('#stock-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = renderStockRows(filteredStockItems);
+      }
+    });
+
+    container.innerHTML += `
+
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">Stock List</h2>
           <button class="btn btn-primary">
-            <span>📦</span>
-            Receive Stock
+            ${Icons.package}
+            <span>Receive Stock</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input 
-            type="text" 
-            class="search-input" 
-            placeholder="Search items by code or name..."
-            id="stock-search"
-          />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table id="stock-table">
@@ -69,14 +138,14 @@ export async function renderInventory(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              ${renderStockRows(stockItems)}
+              ${renderStockRows(filteredStockItems)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
-    setupStockSearch(stockItems);
+    filterPanel.setupEventListeners();
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load inventory data</div>';
     console.error('Inventory error:', error);

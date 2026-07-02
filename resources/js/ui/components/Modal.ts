@@ -1,4 +1,6 @@
 // Modal Component System
+import { Icons } from './Icons';
+
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 export type ModalType = 'view' | 'create' | 'edit' | 'confirm' | 'delete';
 
@@ -41,11 +43,11 @@ class ModalManager {
 
   private getTypeIcon(type: ModalType): string {
     const icons = {
-      view: '👁️',
-      create: '➕',
-      edit: '✏️',
-      confirm: '❓',
-      delete: '🗑️',
+      view: Icons.view,
+      create: Icons.add,
+      edit: Icons.edit,
+      confirm: Icons.info,
+      delete: Icons.delete,
     };
     return icons[type] || '';
   }
@@ -75,7 +77,7 @@ class ModalManager {
               ${icon ? `<span class="modal-icon">${icon}</span>` : ''}
               ${title}
             </h2>
-            <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+            <button class="modal-close" id="modal-close" aria-label="Close">${Icons.close}</button>
           </div>
           <div class="modal-body">
             ${content}

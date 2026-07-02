@@ -1,17 +1,102 @@
 import { documentService } from '../../api/services/documents';
 import type { Document } from '../../types';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderDocuments(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading documents...</div>';
 
   try {
     const documents = await documentService.getAll();
+    let filteredDocuments = [...documents];
 
     const statusCounts = {
       draft: documents.filter(d => d.status === 'draft').length,
       under_review: documents.filter(d => d.status === 'under_review').length,
       approved: documents.filter(d => d.status === 'approved').length,
     };
+
+    // Define filters
+    const filterConfigs: FilterConfig[] = [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'search',
+        placeholder: 'Search by title or number...',
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'draft', label: 'Draft' },
+          { value: 'under_review', label: 'Under Review' },
+          { value: 'approved', label: 'Approved' },
+          { value: 'rejected', label: 'Rejected' },
+          { value: 'archived', label: 'Archived' },
+        ],
+      },
+      {
+        id: 'type',
+        label: 'Document Type',
+        type: 'select',
+        options: [
+          { value: 'contract', label: 'Contract' },
+          { value: 'invoice', label: 'Invoice' },
+          { value: 'report', label: 'Report' },
+          { value: 'specification', label: 'Specification' },
+          { value: 'other', label: 'Other' },
+        ],
+      },
+      {
+        id: 'dateRange',
+        label: 'Upload Date',
+        type: 'dateRange',
+      },
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filteredDocuments = documents.filter(doc => {
+        // Search filter
+        if (values.search) {
+          const search = values.search.toLowerCase();
+          const matchesSearch = 
+            doc.title.toLowerCase().includes(search) ||
+            doc.documentNumber.toLowerCase().includes(search);
+          if (!matchesSearch) return false;
+        }
+
+        // Status filter
+        if (values.status && doc.status !== values.status) {
+          return false;
+        }
+
+        // Type filter
+        if (values.type && doc.documentType !== values.type) {
+          return false;
+        }
+
+        // Date range filter
+        if (values.dateRange?.start || values.dateRange?.end) {
+          const uploadDate = new Date(doc.uploadDate);
+          if (values.dateRange.start) {
+            const startDate = new Date(values.dateRange.start);
+            if (uploadDate < startDate) return false;
+          }
+          if (values.dateRange.end) {
+            const endDate = new Date(values.dateRange.end);
+            if (uploadDate > endDate) return false;
+          }
+        }
+
+        return true;
+      });
+      
+      const tableBody = document.querySelector('#document-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = renderDocumentRows(filteredDocuments);
+      }
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -38,19 +123,12 @@ export async function renderDocuments(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">Documents</h2>
           <button class="btn btn-primary">
-            <span>📤</span>
-            Upload Document
+            ${Icons.upload}
+            <span>Upload Document</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input 
-            type="text" 
-            class="search-input" 
-            placeholder="Search documents by title or number..."
-            id="document-search"
-          />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table id="document-table">
@@ -66,14 +144,14 @@ export async function renderDocuments(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              ${renderDocumentRows(documents)}
+              ${renderDocumentRows(filteredDocuments)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
-    setupDocumentSearch(documents);
+    filterPanel.setupEventListeners();
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load documents</div>';
     console.error('Documents error:', error);
@@ -90,9 +168,9 @@ function renderDocumentRows(documents: Document[]): string {
       <td>${formatDate(doc.uploadDate)}</td>
       <td><span class="badge badge-${getStatusBadgeClass(doc.status)}">${doc.status.replace('_', ' ').toUpperCase()}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline" title="Download">⬇️</button>
-        <button class="btn btn-sm btn-outline" title="Review">✓</button>
+        <button class="btn btn-sm btn-outline" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline" title="Download">${Icons.download}</button>
+        <button class="btn btn-sm btn-outline" title="Review">${Icons.check}</button>
       </td>
     </tr>
   `).join('');

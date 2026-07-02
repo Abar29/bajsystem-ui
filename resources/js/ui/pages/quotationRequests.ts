@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface QuotationRequest {
   id: string;
@@ -85,6 +87,76 @@ const mockQuotationRequests: QuotationRequest[] = [
 ];
 
 export async function renderQuotationRequests(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search requests...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'draft', label: 'Draft' },
+        { value: 'sent', label: 'Sent' },
+        { value: 'received', label: 'Received' },
+        { value: 'closed', label: 'Closed' }
+      ]
+    },
+    { 
+      id: 'priority', 
+      label: 'Priority', 
+      type: 'select',
+      options: [
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' }
+      ]
+    },
+    { id: 'dateRange', label: 'Request Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockQuotationRequests];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.requestNumber.toLowerCase().includes(query) ||
+        r.requester.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(r => r.status === currentFilters.status);
+    }
+    
+    if (currentFilters.priority) {
+      filtered = filtered.filter(r => r.priority === currentFilters.priority);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(r => {
+        const date = new Date(r.requestDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#qr-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderQRRows(filtered);
+      setupQRActions(mockQuotationRequests);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Quotation Requests</h1>
@@ -95,19 +167,12 @@ export async function renderQuotationRequests(container: HTMLElement): Promise<v
       <div class="card-header">
         <h2 class="card-title">All Quotation Requests</h2>
         <button class="btn btn-primary" id="add-qr-btn">
-          <span>➕</span>
-          Create Request
+          ${Icons.add}
+          <span>Create Request</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search requests..."
-          id="qr-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="qr-table">
@@ -130,7 +195,7 @@ export async function renderQuotationRequests(container: HTMLElement): Promise<v
     </div>
   `;
 
-  setupQRSearch(mockQuotationRequests);
+  filterPanel.setupEventListeners();
   setupQRActions(mockQuotationRequests);
 }
 
@@ -159,29 +224,12 @@ function renderQRRows(requests: QuotationRequest[]): string {
         </span>
       </td>
       <td>
-        <button class="btn btn-sm btn-outline view-qr" data-id="${qr.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-qr" data-id="${qr.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-qr" data-id="${qr.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-qr" data-id="${qr.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-qr" data-id="${qr.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-qr" data-id="${qr.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupQRSearch(requests: QuotationRequest[]): void {
-  const searchInput = document.getElementById('qr-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#qr-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = requests.filter(r => 
-      r.requestNumber.toLowerCase().includes(query) ||
-      r.requester.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderQRRows(filtered);
-    setupQRActions(requests);
-  });
 }
 
 function setupQRActions(requests: QuotationRequest[]): void {

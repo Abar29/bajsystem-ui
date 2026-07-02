@@ -1,5 +1,7 @@
 import type { StockBatch } from '../../types';
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 const mockStockBatches: StockBatch[] = [
   {
@@ -69,6 +71,62 @@ const mockStockBatches: StockBatch[] = [
 ];
 
 export async function renderStockBatches(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search batches...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'active', label: 'Active' },
+        { value: 'depleted', label: 'Depleted' },
+        { value: 'expired', label: 'Expired' }
+      ]
+    },
+    { id: 'dateRange', label: 'Expiry Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockStockBatches];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(b => 
+        b.batchNumber.toLowerCase().includes(query) ||
+        b.itemName.toLowerCase().includes(query) ||
+        b.itemCode.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(b => b.status === currentFilters.status);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(b => {
+        const date = new Date(b.expiryDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#batches-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderBatchRows(filtered);
+      setupBatchActions(mockStockBatches);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Stock Batches</h1>
@@ -79,19 +137,12 @@ export async function renderStockBatches(container: HTMLElement): Promise<void> 
       <div class="card-header">
         <h2 class="card-title">All Stock Batches</h2>
         <button class="btn btn-primary" id="add-batch-btn">
-          <span>➕</span>
-          Add Batch
+          ${Icons.add}
+          <span>Add Batch</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search batches by number or item..."
-          id="batch-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="batches-table">
@@ -115,7 +166,7 @@ export async function renderStockBatches(container: HTMLElement): Promise<void> 
     </div>
   `;
 
-  setupBatchSearch(mockStockBatches);
+  filterPanel.setupEventListeners();
   setupBatchActions(mockStockBatches);
 }
 
@@ -143,31 +194,13 @@ function renderBatchRows(batches: StockBatch[]): string {
           </span>
         </td>
         <td>
-          <button class="btn btn-sm btn-outline view-batch" data-id="${batch.id}" title="View">👁️</button>
-          <button class="btn btn-sm btn-outline edit-batch" data-id="${batch.id}" title="Edit">✏️</button>
-          <button class="btn btn-sm btn-outline delete-batch" data-id="${batch.id}" title="Delete">🗑️</button>
+          <button class="btn btn-sm btn-outline view-batch" data-id="${batch.id}" title="View">${Icons.view}</button>
+          <button class="btn btn-sm btn-outline edit-batch" data-id="${batch.id}" title="Edit">${Icons.edit}</button>
+          <button class="btn btn-sm btn-outline delete-batch" data-id="${batch.id}" title="Delete">${Icons.delete}</button>
         </td>
       </tr>
     `;
   }).join('');
-}
-
-function setupBatchSearch(batches: StockBatch[]): void {
-  const searchInput = document.getElementById('batch-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#batches-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = batches.filter(b => 
-      b.batchNumber.toLowerCase().includes(query) ||
-      b.itemName.toLowerCase().includes(query) ||
-      b.itemCode.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderBatchRows(filtered);
-    setupBatchActions(batches);
-  });
 }
 
 function setupBatchActions(batches: StockBatch[]): void {

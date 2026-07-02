@@ -1,12 +1,62 @@
 import { supplierService } from '../../api/services/suppliers';
 import type { Supplier } from '../../types';
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderSuppliers(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading suppliers...</div>';
 
   try {
     const suppliers = await supplierService.getAll();
+    let filteredSuppliers = [...suppliers];
+
+    // Define filters
+    const filterConfigs: FilterConfig[] = [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'search',
+        placeholder: 'Search by name, code, or contact...',
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { value: 'active', label: 'Active' },
+          { value: 'inactive', label: 'Inactive' },
+        ],
+      },
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filteredSuppliers = suppliers.filter(supplier => {
+        // Search filter
+        if (values.search) {
+          const search = values.search.toLowerCase();
+          const matchesSearch = 
+            supplier.name.toLowerCase().includes(search) ||
+            supplier.code.toLowerCase().includes(search) ||
+            supplier.contactPerson.toLowerCase().includes(search) ||
+            supplier.email.toLowerCase().includes(search);
+          if (!matchesSearch) return false;
+        }
+
+        // Status filter
+        if (values.status && supplier.status !== values.status) {
+          return false;
+        }
+
+        return true;
+      });
+      
+      const tableBody = document.querySelector('#suppliers-table tbody');
+      if (tableBody) {
+        tableBody.innerHTML = renderSupplierRows(filteredSuppliers);
+        setupSupplierActions(suppliers);
+      }
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -18,19 +68,12 @@ export async function renderSuppliers(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">All Suppliers</h2>
           <button class="btn btn-primary" id="add-supplier-btn">
-            <span>➕</span>
-            Add Supplier
+            ${Icons.add}
+            <span>Add Supplier</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input 
-            type="text" 
-            class="search-input" 
-            placeholder="Search suppliers by name or code..."
-            id="supplier-search"
-          />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table id="suppliers-table">
@@ -46,14 +89,14 @@ export async function renderSuppliers(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody>
-              ${renderSupplierRows(suppliers)}
+              ${renderSupplierRows(filteredSuppliers)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
-    setupSupplierSearch(suppliers);
+    filterPanel.setupEventListeners();
     setupSupplierActions(suppliers);
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load suppliers</div>';
@@ -75,30 +118,18 @@ function renderSupplierRows(suppliers: Supplier[]): string {
         </span>
       </td>
       <td>
-        <button class="btn btn-sm btn-outline view-supplier" data-id="${supplier.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-supplier" data-id="${supplier.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-supplier" data-id="${supplier.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-supplier" data-id="${supplier.id}" title="View">
+          ${Icons.view}
+        </button>
+        <button class="btn btn-sm btn-outline edit-supplier" data-id="${supplier.id}" title="Edit">
+          ${Icons.edit}
+        </button>
+        <button class="btn btn-sm btn-outline delete-supplier" data-id="${supplier.id}" title="Delete">
+          ${Icons.delete}
+        </button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupSupplierSearch(suppliers: Supplier[]): void {
-  const searchInput = document.getElementById('supplier-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#suppliers-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = suppliers.filter(s => 
-      s.name.toLowerCase().includes(query) ||
-      s.code.toLowerCase().includes(query) ||
-      s.contactPerson.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderSupplierRows(filtered);
-    setupSupplierActions(suppliers);
-  });
 }
 
 function setupSupplierActions(suppliers: Supplier[]): void {

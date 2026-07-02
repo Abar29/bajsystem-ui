@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface Boxing {
   id: string;
@@ -138,6 +140,61 @@ const mockBoxings: Boxing[] = [
 ];
 
 export async function renderBoxing(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search boxing records...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'shipped', label: 'Shipped' }
+      ]
+    },
+    { id: 'dateRange', label: 'Boxing Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockBoxings];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(b => 
+        b.boxingNumber.toLowerCase().includes(query) ||
+        b.deliveryNumber.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(b => b.status === currentFilters.status);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(b => {
+        const date = new Date(b.boxingDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#boxing-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderBoxingRows(filtered);
+      setupBoxingActions(mockBoxings);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Boxing</h1>
@@ -148,19 +205,12 @@ export async function renderBoxing(container: HTMLElement): Promise<void> {
       <div class="card-header">
         <h2 class="card-title">All Boxing Records</h2>
         <button class="btn btn-primary" id="add-boxing-btn">
-          <span>➕</span>
-          New Boxing
+          ${Icons.add}
+          <span>New Boxing</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search boxing records..."
-          id="boxing-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="boxing-table">
@@ -183,7 +233,7 @@ export async function renderBoxing(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  setupBoxingSearch(mockBoxings);
+  filterPanel.setupEventListeners();
   setupBoxingActions(mockBoxings);
 }
 
@@ -204,29 +254,12 @@ function renderBoxingRows(boxings: Boxing[]): string {
       </td>
       <td>${box.packedBy}</td>
       <td>
-        <button class="btn btn-sm btn-outline view-boxing" data-id="${box.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-boxing" data-id="${box.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-boxing" data-id="${box.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-boxing" data-id="${box.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-boxing" data-id="${box.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-boxing" data-id="${box.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupBoxingSearch(boxings: Boxing[]): void {
-  const searchInput = document.getElementById('boxing-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#boxing-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = boxings.filter(b => 
-      b.boxingNumber.toLowerCase().includes(query) ||
-      b.deliveryNumber.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderBoxingRows(filtered);
-    setupBoxingActions(boxings);
-  });
 }
 
 function setupBoxingActions(boxings: Boxing[]): void {

@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface Transfer {
   id: string;
@@ -80,6 +82,63 @@ const mockTransfers: Transfer[] = [
 ];
 
 export async function renderTransfers(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search transfers...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'draft', label: 'Draft' },
+        { value: 'in_transit', label: 'In Transit' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'cancelled', label: 'Cancelled' }
+      ]
+    },
+    { id: 'dateRange', label: 'Transfer Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockTransfers];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.transferNumber.toLowerCase().includes(query) ||
+        t.fromWarehouse.toLowerCase().includes(query) ||
+        t.toWarehouse.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(t => t.status === currentFilters.status);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(t => {
+        const date = new Date(t.transferDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#transfers-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderTransferRows(filtered);
+      setupTransferActions(mockTransfers);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Stock Transfers</h1>
@@ -90,19 +149,12 @@ export async function renderTransfers(container: HTMLElement): Promise<void> {
       <div class="card-header">
         <h2 class="card-title">All Transfers</h2>
         <button class="btn btn-primary" id="add-transfer-btn">
-          <span>➕</span>
-          New Transfer
+          ${Icons.add}
+          <span>New Transfer</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search transfers..."
-          id="transfer-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="transfers-table">
@@ -126,7 +178,7 @@ export async function renderTransfers(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  setupTransferSearch(mockTransfers);
+  filterPanel.setupEventListeners();
   setupTransferActions(mockTransfers);
 }
 
@@ -149,30 +201,12 @@ function renderTransferRows(transfers: Transfer[]): string {
       </td>
       <td>${trf.requestedBy}</td>
       <td>
-        <button class="btn btn-sm btn-outline view-transfer" data-id="${trf.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-transfer" data-id="${trf.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-transfer" data-id="${trf.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-transfer" data-id="${trf.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-transfer" data-id="${trf.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-transfer" data-id="${trf.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupTransferSearch(transfers: Transfer[]): void {
-  const searchInput = document.getElementById('transfer-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#transfers-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = transfers.filter(t => 
-      t.transferNumber.toLowerCase().includes(query) ||
-      t.fromWarehouse.toLowerCase().includes(query) ||
-      t.toWarehouse.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderTransferRows(filtered);
-    setupTransferActions(transfers);
-  });
 }
 
 function setupTransferActions(transfers: Transfer[]): void {

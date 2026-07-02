@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface Receiving {
   id: string;
@@ -100,6 +102,63 @@ const mockReceivings: Receiving[] = [
 ];
 
 export async function renderReceiving(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search receiving records...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'partial', label: 'Partial' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'discrepancy', label: 'Discrepancy' }
+      ]
+    },
+    { id: 'dateRange', label: 'Receiving Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockReceivings];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(r => 
+        r.receivingNumber.toLowerCase().includes(query) ||
+        r.poNumber.toLowerCase().includes(query) ||
+        r.supplierName.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(r => r.status === currentFilters.status);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(r => {
+        const date = new Date(r.receivingDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#receiving-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderReceivingRows(filtered);
+      setupReceivingActions(mockReceivings);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Receiving</h1>
@@ -110,19 +169,12 @@ export async function renderReceiving(container: HTMLElement): Promise<void> {
       <div class="card-header">
         <h2 class="card-title">All Receiving Records</h2>
         <button class="btn btn-primary" id="add-receiving-btn">
-          <span>➕</span>
-          New Receiving
+          ${Icons.add}
+          <span>New Receiving</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search receiving records..."
-          id="receiving-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="receiving-table">
@@ -146,7 +198,7 @@ export async function renderReceiving(container: HTMLElement): Promise<void> {
     </div>
   `;
 
-  setupReceivingSearch(mockReceivings);
+  filterPanel.setupEventListeners();
   setupReceivingActions(mockReceivings);
 }
 
@@ -169,30 +221,12 @@ function renderReceivingRows(receivings: Receiving[]): string {
       </td>
       <td>${rcv.receivedBy}</td>
       <td>
-        <button class="btn btn-sm btn-outline view-receiving" data-id="${rcv.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-receiving" data-id="${rcv.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-receiving" data-id="${rcv.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-receiving" data-id="${rcv.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-receiving" data-id="${rcv.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-receiving" data-id="${rcv.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupReceivingSearch(receivings: Receiving[]): void {
-  const searchInput = document.getElementById('receiving-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#receiving-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = receivings.filter(r => 
-      r.receivingNumber.toLowerCase().includes(query) ||
-      r.poNumber.toLowerCase().includes(query) ||
-      r.supplierName.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderReceivingRows(filtered);
-    setupReceivingActions(receivings);
-  });
 }
 
 function setupReceivingActions(receivings: Receiving[]): void {

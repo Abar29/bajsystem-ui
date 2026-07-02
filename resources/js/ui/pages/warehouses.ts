@@ -1,12 +1,32 @@
 import type { Warehouse } from '../../types';
 import { mockWarehouses } from '../../mock/data';
 import { modal } from '../components/Modal';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
+import { Icons } from '../components/Icons';
 
 export async function renderWarehouses(container: HTMLElement): Promise<void> {
   container.innerHTML = '<div class="loading">Loading warehouses...</div>';
 
   try {
     const warehouses = mockWarehouses;
+    let filtered = [...warehouses];
+
+    const filterConfigs: FilterConfig[] = [
+      { id: 'search', label: 'Search', type: 'search', placeholder: 'Search warehouses...' },
+      { id: 'status', label: 'Status', type: 'select', options: [
+        { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }
+      ]},
+    ];
+
+    const filterPanel = new FilterPanel(filterConfigs, (values) => {
+      filtered = warehouses.filter(w => {
+        if (values.search && !w.name.toLowerCase().includes(values.search.toLowerCase()) && !w.code.toLowerCase().includes(values.search.toLowerCase())) return false;
+        if (values.status && w.status !== values.status) return false;
+        return true;
+      });
+      document.getElementById('table-body')!.innerHTML = renderRows(filtered);
+      setupActions(warehouses);
+    });
 
     container.innerHTML = `
       <div class="page-header">
@@ -18,14 +38,11 @@ export async function renderWarehouses(container: HTMLElement): Promise<void> {
         <div class="card-header">
           <h2 class="card-title">All Warehouses</h2>
           <button class="btn btn-primary" id="add-btn">
-            <span>➕</span>
-            Add Warehouse
+            ${Icons.add}<span>Add Warehouse</span>
           </button>
         </div>
 
-        <div class="search-box">
-          <input type="text" class="search-input" placeholder="Search warehouses..." id="search" />
-        </div>
+        ${filterPanel.render()}
 
         <div class="table-container">
           <table>
@@ -41,13 +58,14 @@ export async function renderWarehouses(container: HTMLElement): Promise<void> {
               </tr>
             </thead>
             <tbody id="table-body">
-              ${renderRows(warehouses)}
+              ${renderRows(filtered)}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    filterPanel.setupEventListeners();
     setupActions(warehouses);
   } catch (error) {
     container.innerHTML = '<div class="error">Failed to load warehouses</div>';
@@ -64,24 +82,15 @@ function renderRows(items: Warehouse[]): string {
       <td>${w.manager}</td>
       <td><span class="badge badge-${w.status === 'active' ? 'success' : 'secondary'}">${w.status.toUpperCase()}</span></td>
       <td>
-        <button class="btn btn-sm btn-outline view-btn" data-id="${w.id}">👁️</button>
-        <button class="btn btn-sm btn-outline edit-btn" data-id="${w.id}">✏️</button>
-        <button class="btn btn-sm btn-outline delete-btn" data-id="${w.id}">🗑️</button>
+        <button class="btn btn-sm btn-outline view-btn" data-id="${w.id}">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-btn" data-id="${w.id}">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-btn" data-id="${w.id}">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
 }
 
 function setupActions(items: Warehouse[]): void {
-  document.getElementById('search')?.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = items.filter(w => 
-      w.name.toLowerCase().includes(query) || w.code.toLowerCase().includes(query)
-    );
-    document.getElementById('table-body')!.innerHTML = renderRows(filtered);
-    setupActions(items);
-  });
-
   document.getElementById('add-btn')?.addEventListener('click', () => showForm('create'));
 
   document.querySelectorAll('.view-btn').forEach(btn => {

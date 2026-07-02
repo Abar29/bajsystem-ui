@@ -1,4 +1,6 @@
 import { modal } from '../components/Modal';
+import { Icons } from '../components/Icons';
+import { FilterPanel, type FilterConfig } from '../components/FilterPanel';
 
 interface Acknowledgement {
   id: string;
@@ -86,6 +88,62 @@ const mockAcknowledgements: Acknowledgement[] = [
 ];
 
 export async function renderAcknowledgements(container: HTMLElement): Promise<void> {
+  let currentFilters: any = {};
+  
+  const filterConfigs: FilterConfig[] = [
+    { id: 'search', label: 'Search', type: 'search', placeholder: 'Search acknowledgements...' },
+    { 
+      id: 'status', 
+      label: 'Status', 
+      type: 'select',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'acknowledged', label: 'Acknowledged' },
+        { value: 'rejected', label: 'Rejected' }
+      ]
+    },
+    { id: 'dateRange', label: 'Received Date', type: 'dateRange' }
+  ];
+
+  const filterPanel = new FilterPanel(filterConfigs, (filters) => {
+    currentFilters = filters;
+    applyFilters();
+  });
+
+  const applyFilters = () => {
+    let filtered = [...mockAcknowledgements];
+    
+    if (currentFilters.search) {
+      const query = currentFilters.search.toLowerCase();
+      filtered = filtered.filter(a => 
+        a.acknowledgementNumber.toLowerCase().includes(query) ||
+        a.deliveryNumber.toLowerCase().includes(query) ||
+        a.agencyName.toLowerCase().includes(query)
+      );
+    }
+    
+    if (currentFilters.status) {
+      filtered = filtered.filter(a => a.status === currentFilters.status);
+    }
+    
+    if (currentFilters.dateRange?.start || currentFilters.dateRange?.end) {
+      filtered = filtered.filter(a => {
+        const date = new Date(a.receivedDate);
+        const start = currentFilters.dateRange.start ? new Date(currentFilters.dateRange.start) : null;
+        const end = currentFilters.dateRange.end ? new Date(currentFilters.dateRange.end) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      });
+    }
+    
+    const tableBody = document.querySelector('#ack-table tbody');
+    if (tableBody) {
+      tableBody.innerHTML = renderAckRows(filtered);
+      setupAckActions(mockAcknowledgements);
+    }
+  };
+
   container.innerHTML = `
     <div class="page-header">
       <h1 class="page-title">Acknowledgement Receipts</h1>
@@ -96,19 +154,12 @@ export async function renderAcknowledgements(container: HTMLElement): Promise<vo
       <div class="card-header">
         <h2 class="card-title">All Acknowledgements</h2>
         <button class="btn btn-primary" id="add-ack-btn">
-          <span>➕</span>
-          New Acknowledgement
+          ${Icons.add}
+          <span>New Acknowledgement</span>
         </button>
       </div>
 
-      <div class="search-box">
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Search acknowledgements..."
-          id="ack-search"
-        />
-      </div>
+      ${filterPanel.render()}
 
       <div class="table-container">
         <table id="ack-table">
@@ -131,7 +182,7 @@ export async function renderAcknowledgements(container: HTMLElement): Promise<vo
     </div>
   `;
 
-  setupAckSearch(mockAcknowledgements);
+  filterPanel.setupEventListeners();
   setupAckActions(mockAcknowledgements);
 }
 
@@ -152,30 +203,12 @@ function renderAckRows(acks: Acknowledgement[]): string {
         </span>
       </td>
       <td>
-        <button class="btn btn-sm btn-outline view-ack" data-id="${ack.id}" title="View">👁️</button>
-        <button class="btn btn-sm btn-outline edit-ack" data-id="${ack.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm btn-outline delete-ack" data-id="${ack.id}" title="Delete">🗑️</button>
+        <button class="btn btn-sm btn-outline view-ack" data-id="${ack.id}" title="View">${Icons.view}</button>
+        <button class="btn btn-sm btn-outline edit-ack" data-id="${ack.id}" title="Edit">${Icons.edit}</button>
+        <button class="btn btn-sm btn-outline delete-ack" data-id="${ack.id}" title="Delete">${Icons.delete}</button>
       </td>
     </tr>
   `).join('');
-}
-
-function setupAckSearch(acks: Acknowledgement[]): void {
-  const searchInput = document.getElementById('ack-search') as HTMLInputElement;
-  const tableBody = document.querySelector('#ack-table tbody');
-
-  if (!searchInput || !tableBody) return;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = (e.target as HTMLInputElement).value.toLowerCase();
-    const filtered = acks.filter(a => 
-      a.acknowledgementNumber.toLowerCase().includes(query) ||
-      a.deliveryNumber.toLowerCase().includes(query) ||
-      a.agencyName.toLowerCase().includes(query)
-    );
-    tableBody.innerHTML = renderAckRows(filtered);
-    setupAckActions(acks);
-  });
 }
 
 function setupAckActions(acks: Acknowledgement[]): void {
